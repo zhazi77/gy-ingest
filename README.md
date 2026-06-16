@@ -93,3 +93,31 @@ python -m gy_ingest.sync_rss --wiki-root C:\path\to\gy-wiki --git --push
 ```
 
 Set the task's working directory to the `gy-ingest` repository.
+
+## Server Health Check
+
+On the server, run:
+
+```bash
+cd ~/gy-ingest
+bash scripts/check_server.sh
+```
+
+The health check:
+
+- pulls the latest `gy-ingest`
+- runs unit tests
+- creates a temporary wiki
+- runs a full RSS sync into that temporary wiki
+- prints the real `gy-wiki` git status
+
+It does not write test data into the real `gy-wiki`.
+
+## Server Sync Command
+
+After the health check passes, run the real sync with:
+
+```bash
+cd ~/gy-ingest
+python3 -m gy_ingest.sync_rss --wiki-root ~/gy-wiki --git --push
+```

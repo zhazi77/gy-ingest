@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
@@ -183,6 +184,8 @@ def sync_sources(
     *,
     now: datetime | None = None,
     fetcher: Callable[[str], str] = fetch_url,
+    max_attempts: int = 3,
+    retry_delay_seconds: float = 2.0,
 ) -> dict:
     now = now or datetime.now(timezone.utc)
     manifest = _load_manifest(wiki_root)
@@ -191,7 +194,12 @@ def sync_sources(
 
     for source in sources:
         source_name = source["name"]
-        xml_text = fetcher(source["url"])
+        xml_text = _fetch_with_retries(
+            source,
+            fetcher,
+            max_attempts=max_attempts,
+            retry_delay_seconds=retry_delay_seconds,
+        )
         feed_path = _write_feed_xml(wiki_root, source_name, xml_text, now)
         feed_files_written += 1
 
@@ -215,6 +223,30 @@ def sync_sources(
     _save_manifest(wiki_root, manifest, now)
 
     return {"new_items": len(new_entries), "feed_files": feed_files_written}
+
+
+def _fetch_with_retries(
+    source: dict,
+    fetcher: Callable[[str], str],
+    *,
+    max_attempts: int,
+    retry_delay_seconds: float,
+) -> str:
+    last_error: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return fetcher(source["url"])
+        except Exception as exc:
+            last_error = exc
+            if attempt == max_attempts:
+                break
+            print(
+                f"Fetch failed for {source['name']} ({attempt}/{max_attempts}): {exc}; retrying...",
+                file=sys.stderr,
+            )
+            if retry_delay_seconds > 0:
+                time.sleep(retry_delay_seconds)
+    raise RuntimeError(f"Failed to fetch RSS source {source['name']} at {source['url']}: {last_error}")
 
 
 def _load_manifest(wiki_root: Path) -> dict:

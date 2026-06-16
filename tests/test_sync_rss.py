@@ -93,6 +93,29 @@ sources:
         self.assertIn("First Post", inbox)
         self.assertIn("https://example.com/first", inbox)
 
+    def test_sync_sources_retries_transient_fetch_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            wiki_root = Path(tmp) / "gy-wiki"
+            attempts = {"count": 0}
+
+            def flaky_fetcher(url):
+                attempts["count"] += 1
+                if attempts["count"] == 1:
+                    raise TimeoutError("temporary timeout")
+                return SAMPLE_RSS
+
+            result = sync_sources(
+                [{"name": "example", "type": "rss", "url": "https://example.com/feed.xml"}],
+                wiki_root,
+                now=datetime(2026, 6, 16, 12, 30, tzinfo=timezone.utc),
+                fetcher=flaky_fetcher,
+                max_attempts=2,
+                retry_delay_seconds=0,
+            )
+
+        self.assertEqual(result["new_items"], 1)
+        self.assertEqual(attempts["count"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()
