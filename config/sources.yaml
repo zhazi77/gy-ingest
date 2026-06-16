@@ -1,0 +1,15 @@
+sources:
+  - name: openai-news
+    type: rss
+    url: https://openai.com/news/rss.xml
+    tags: ai, openai, research
+
+  - name: anthropic-engineering-community
+    type: rss
+    url: https://raw.githubusercontent.com/conoro/anthropic-engineering-rss-feed/main/anthropic_engineering_rss.xml
+    tags: ai, anthropic, engineering
+
+  - name: anthropic-news-community
+    type: rss
+    url: https://raw.githubusercontent.com/akao47/yuna-feeds-bridge/main/anthropic.xml
+    tags: ai, anthropic, news
