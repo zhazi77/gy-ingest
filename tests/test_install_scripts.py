@@ -45,6 +45,13 @@ class InstallScriptTests(unittest.TestCase):
 
         self.assertIn("*.sh text eol=lf", attrs)
 
+    def test_powershell_installer_hides_api_key_input(self):
+        powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
+
+        self.assertIn("Read-Host \"Paste API key\" -AsSecureString", powershell)
+        self.assertIn("SecureStringToBSTR", powershell)
+        self.assertIn("ZeroFreeBSTR", powershell)
+
     def test_install_scripts_create_backups_before_writing(self):
         powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
         bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
@@ -68,6 +75,7 @@ class InstallScriptTests(unittest.TestCase):
 
             env = os.environ.copy()
             env["USERPROFILE"] = str(root)
+            env["CODEX_SUB2API_KEY"] = "sk-test"
             subprocess.run(
                 [
                     "powershell",
@@ -76,8 +84,6 @@ class InstallScriptTests(unittest.TestCase):
                     "-File",
                     str(ROOT / "scripts" / "install-codex-sub2api.ps1"),
                 ],
-                input="sk-test\n",
-                text=True,
                 env=env,
                 check=True,
                 capture_output=True,

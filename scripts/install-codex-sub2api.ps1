@@ -96,7 +96,17 @@ function Set-JsonProperty {
 
 Write-Host "Codex Sub2API installer"
 Write-Host "Base URL: $BaseUrl"
-$apiKey = Read-Host "Paste API key"
+if ($env:CODEX_SUB2API_KEY) {
+  $apiKey = $env:CODEX_SUB2API_KEY
+} else {
+  $secureApiKey = Read-Host "Paste API key" -AsSecureString
+  $apiKeyBstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureApiKey)
+  try {
+    $apiKey = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($apiKeyBstr)
+  } finally {
+    [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($apiKeyBstr)
+  }
+}
 $apiKey = $apiKey.Trim()
 if ([string]::IsNullOrWhiteSpace($apiKey)) {
   throw "API key is empty."
