@@ -169,7 +169,7 @@ function Write-RestoreScript {
   $lines.Add('  Write-Host "没有可恢复的备份文件。"')
   $lines.Add('}')
 
-  [System.IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+  [System.IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($true))
 }
 
 Write-Host "Codex Sub2API 安装器"

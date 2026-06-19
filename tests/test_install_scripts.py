@@ -102,7 +102,23 @@ class InstallScriptTests(unittest.TestCase):
 
             config = (codex / "config.toml").read_text(encoding="utf-8")
             auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
-            restore_exists = (codex / "restore-sub2api-backup.ps1").exists()
+            restore_path = codex / "restore-sub2api-backup.ps1"
+            restore_exists = restore_path.exists()
+            restore_has_bom = restore_path.read_bytes().startswith(b"\xef\xbb\xbf")
+
+            subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(restore_path),
+                ],
+                check=True,
+                capture_output=True,
+            )
+            restored_config = (codex / "config.toml").read_text(encoding="utf-8")
+            restored_auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
 
         self.assertNotIn("[]", config)
         self.assertIn('foo = "keep"', config)
@@ -113,6 +129,10 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual(auth["OTHER"], "keep")
         self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
         self.assertTrue(restore_exists)
+        self.assertTrue(restore_has_bom)
+        self.assertIn('model_reasoning_effort = "low"', restored_config)
+        self.assertEqual(restored_auth["OTHER"], "keep")
+        self.assertNotIn("OPENAI_API_KEY", restored_auth)
 
     @unittest.skipIf(shutil.which("powershell") is None, "PowerShell is not available")
     def test_powershell_installer_switches_chatgpt_auth_to_api_key(self):
