@@ -5,15 +5,15 @@ BASE_URL="${BASE_URL:-https://771to8vw3580.vicp.fun}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 PYTHON_BIN="${PYTHON_BIN:-}"
 
-echo "Codex Sub2API installer"
+echo "Codex Sub2API 安装器"
 echo "Base URL: $BASE_URL"
-printf "Paste API key: "
+printf "请粘贴 API key（输入时不会显示）: "
 IFS= read -r -s API_KEY
 echo
 API_KEY="$(printf '%s' "$API_KEY" | tr -d '\r\n ')"
 
 if [[ -z "$API_KEY" ]]; then
-  echo "ERROR: API key is empty." >&2
+  echo "错误：API key 为空。" >&2
   exit 2
 fi
 
@@ -21,7 +21,7 @@ if [[ -z "$PYTHON_BIN" ]]; then
   if command -v python3 >/dev/null 2>&1; then
     PYTHON_BIN="python3"
   else
-    echo "ERROR: python3 is required to merge Codex config." >&2
+    echo "错误：需要 python3 来合并 Codex 配置。" >&2
     exit 3
   fi
 fi
@@ -51,21 +51,21 @@ PY
 )"
 
 if [[ "$AUTH_STATE" == "chatgpt" ]]; then
-  echo "Detected existing Codex ChatGPT login."
-  echo "Switching Codex auth mode to API key and removing cached ChatGPT tokens from auth.json."
-  echo "Restart Codex after this installer finishes so the new auth mode is loaded."
+  echo "检测到 Codex 已经登录过 ChatGPT 账号。"
+  echo "将把 Codex 切换为 API key 模式，并从 auth.json 中移除旧的 ChatGPT 登录缓存。"
+  echo "安装完成后，请完全退出并重新打开 Codex，让新的认证配置生效。"
   if [[ -z "${CODEX_SUB2API_CONFIRM:-}" ]]; then
-    printf "Continue? [Y/n] "
+    printf "是否继续？直接回车表示继续，[n] 取消: "
     IFS= read -r answer
     case "$answer" in
       n|N|no|NO|No)
-        echo "Aborted. No files were changed."
+        echo "已取消，没有修改文件。"
         exit 4
         ;;
     esac
   fi
 else
-  echo "No existing Codex ChatGPT login detected."
+  echo "未检测到已有的 Codex ChatGPT 登录态。"
 fi
 
 CONFIG_BACKUP=""
@@ -92,10 +92,10 @@ fi
     echo 'restored=true'
   fi
   echo 'if [[ "$restored" == true ]]; then'
-  echo '  echo "Restored Codex config/auth from backup."'
-  echo '  echo "Restart Codex so the restored files are loaded."'
+  echo '  echo "已从备份恢复 Codex 配置和认证文件。"'
+  echo '  echo "请完全退出并重新打开 Codex，让恢复后的配置生效。"'
   echo 'else'
-  echo '  echo "No backup files were available to restore."'
+  echo '  echo "没有可恢复的备份文件。"'
   echo 'fi'
 } > "$RESTORE_PATH"
 chmod +x "$RESTORE_PATH"
@@ -186,11 +186,11 @@ auth_path.write_text(json.dumps(auth, ensure_ascii=False, indent=2) + "\n", enco
 PY
 
 echo
-echo "Updated:"
+echo "已更新："
 echo "  $CONFIG_PATH"
 echo "  $AUTH_PATH"
-echo "Restore helper:"
+echo "如需恢复到安装前的配置，请运行："
 echo "  bash \"$RESTORE_PATH\""
-echo "Backups were created for existing files."
-echo "Restart Codex to load the new config and API key auth mode."
-echo "Done."
+echo "已为现有配置文件创建备份。"
+echo "请完全退出并重新打开 Codex，让新的配置和 API key 认证模式生效。"
+echo "完成。"

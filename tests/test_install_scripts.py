@@ -23,7 +23,7 @@ class InstallScriptTests(unittest.TestCase):
             self.assertIn("goals", script)
             self.assertIn("false", script)
             self.assertIn("OPENAI_API_KEY", script)
-            self.assertIn("Restart Codex", script)
+            self.assertIn("请完全退出并重新打开 Codex", script)
             self.assertIn("restore", script)
 
     def test_unix_installer_targets_home_codex_directory(self):
@@ -39,7 +39,7 @@ class InstallScriptTests(unittest.TestCase):
 
         self.assertIn('PYTHON_BIN="${PYTHON_BIN:-}"', bash)
         self.assertIn('command -v python3', bash)
-        self.assertIn('ERROR: python3 is required', bash)
+        self.assertIn('错误：需要 python3', bash)
         self.assertLess(bash.index('command -v python3'), bash.index('mkdir -p "$CODEX_HOME"'))
 
     def test_shell_scripts_are_kept_lf_for_unix(self):
@@ -50,7 +50,7 @@ class InstallScriptTests(unittest.TestCase):
     def test_powershell_installer_hides_api_key_input(self):
         powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
 
-        self.assertIn("Read-Host \"Paste API key\" -AsSecureString", powershell)
+        self.assertIn("Read-Host \"请粘贴 API key（输入时不会显示）\" -AsSecureString", powershell)
         self.assertIn("SecureStringToBSTR", powershell)
         self.assertIn("ZeroFreeBSTR", powershell)
 
@@ -143,6 +143,8 @@ class InstallScriptTests(unittest.TestCase):
                 check=True,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
             )
 
             auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
@@ -152,9 +154,9 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual(auth["OTHER"], "keep")
         self.assertNotIn("tokens", auth)
         self.assertNotIn("last_refresh", auth)
-        self.assertIn("Detected existing Codex ChatGPT login", result.stdout)
-        self.assertIn("Switching Codex auth mode to API key", result.stdout)
-        self.assertIn("Restart Codex", result.stdout)
+        self.assertIn("检测到 Codex 已经登录过 ChatGPT 账号", result.stdout)
+        self.assertIn("将把 Codex 切换为 API key 模式", result.stdout)
+        self.assertIn("请完全退出并重新打开 Codex", result.stdout)
 
     def test_install_scripts_create_restore_helpers(self):
         powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")

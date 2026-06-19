@@ -1,4 +1,4 @@
-param(
+﻿param(
   [string]$BaseUrl = "https://771to8vw3580.vicp.fun"
 )
 
@@ -120,18 +120,18 @@ function Confirm-AuthSwitch {
   }
 
   if ($hasChatGptAuth) {
-    Write-Host "Detected existing Codex ChatGPT login."
-    Write-Host "Switching Codex auth mode to API key and removing cached ChatGPT tokens from auth.json."
-    Write-Host "Restart Codex after this installer finishes so the new auth mode is loaded."
+    Write-Host "检测到 Codex 已经登录过 ChatGPT 账号。"
+    Write-Host "将把 Codex 切换为 API key 模式，并从 auth.json 中移除旧的 ChatGPT 登录缓存。"
+    Write-Host "安装完成后，请完全退出并重新打开 Codex，让新的认证配置生效。"
     if (-not $env:CODEX_SUB2API_CONFIRM) {
-      $answer = Read-Host "Continue? [Y/n]"
+      $answer = Read-Host "是否继续？直接回车表示继续，[n] 取消"
       if ($answer -match '^(n|no)$') {
-        Write-Host "Aborted. No files were changed."
+        Write-Host "已取消，没有修改文件。"
         exit 4
       }
     }
   } else {
-    Write-Host "No existing Codex ChatGPT login detected."
+    Write-Host "未检测到已有的 Codex ChatGPT 登录态。"
   }
 }
 
@@ -161,21 +161,21 @@ function Write-RestoreScript {
     $lines.Add('$restored = $true')
   }
   $lines.Add('if ($restored) {')
-  $lines.Add('  Write-Host "Restored Codex config/auth from backup."')
-  $lines.Add('  Write-Host "Restart Codex so the restored files are loaded."')
+  $lines.Add('  Write-Host "已从备份恢复 Codex 配置和认证文件。"')
+  $lines.Add('  Write-Host "请完全退出并重新打开 Codex，让恢复后的配置生效。"')
   $lines.Add('} else {')
-  $lines.Add('  Write-Host "No backup files were available to restore."')
+  $lines.Add('  Write-Host "没有可恢复的备份文件。"')
   $lines.Add('}')
 
   [System.IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
 }
 
-Write-Host "Codex Sub2API installer"
+Write-Host "Codex Sub2API 安装器"
 Write-Host "Base URL: $BaseUrl"
 if ($env:CODEX_SUB2API_KEY) {
   $apiKey = $env:CODEX_SUB2API_KEY
 } else {
-  $secureApiKey = Read-Host "Paste API key" -AsSecureString
+  $secureApiKey = Read-Host "请粘贴 API key（输入时不会显示）" -AsSecureString
   $apiKeyBstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureApiKey)
   try {
     $apiKey = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($apiKeyBstr)
@@ -185,7 +185,7 @@ if ($env:CODEX_SUB2API_KEY) {
 }
 $apiKey = $apiKey.Trim()
 if ([string]::IsNullOrWhiteSpace($apiKey)) {
-  throw "API key is empty."
+  throw "API key 为空。"
 }
 
 $codexDir = Join-Path $env:USERPROFILE ".codex"
@@ -227,11 +227,11 @@ $configText = ($lines -join "`n").TrimEnd() + "`n"
 Set-CodexApiKeyAuth $authPath $apiKey
 
 Write-Host ""
-Write-Host "Updated:"
+Write-Host "已更新："
 Write-Host "  $configPath"
 Write-Host "  $authPath"
-Write-Host "Restore helper:"
+Write-Host "如需恢复到安装前的配置，请运行："
 Write-Host "  powershell -ExecutionPolicy Bypass -File `"$restorePath`""
-Write-Host "Backups were created for existing files."
-Write-Host "Restart Codex to load the new config and API key auth mode."
-Write-Host "Done."
+Write-Host "已为现有配置文件创建备份。"
+Write-Host "请完全退出并重新打开 Codex，让新的配置和 API key 认证模式生效。"
+Write-Host "完成。"
