@@ -29,10 +29,76 @@ fi
 mkdir -p "$CODEX_HOME"
 CONFIG_PATH="$CODEX_HOME/config.toml"
 AUTH_PATH="$CODEX_HOME/auth.json"
+RESTORE_PATH="$CODEX_HOME/restore-sub2api-backup.sh"
 STAMP="$(date +%Y%m%d%H%M%S)"
 
-[[ -f "$CONFIG_PATH" ]] && cp "$CONFIG_PATH" "$CONFIG_PATH.bak-$STAMP"
-[[ -f "$AUTH_PATH" ]] && cp "$AUTH_PATH" "$AUTH_PATH.bak-$STAMP"
+AUTH_STATE="$(AUTH_PATH="$AUTH_PATH" "$PYTHON_BIN" - <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["AUTH_PATH"])
+try:
+    auth = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+except Exception:
+    auth = {}
+
+if isinstance(auth, dict) and (auth.get("auth_mode") == "chatgpt" or "tokens" in auth):
+    print("chatgpt")
+else:
+    print("none")
+PY
+)"
+
+if [[ "$AUTH_STATE" == "chatgpt" ]]; then
+  echo "Detected existing Codex ChatGPT login."
+  echo "Switching Codex auth mode to API key and removing cached ChatGPT tokens from auth.json."
+  echo "Restart Codex after this installer finishes so the new auth mode is loaded."
+  if [[ -z "${CODEX_SUB2API_CONFIRM:-}" ]]; then
+    printf "Continue? [Y/n] "
+    IFS= read -r answer
+    case "$answer" in
+      n|N|no|NO|No)
+        echo "Aborted. No files were changed."
+        exit 4
+        ;;
+    esac
+  fi
+else
+  echo "No existing Codex ChatGPT login detected."
+fi
+
+CONFIG_BACKUP=""
+AUTH_BACKUP=""
+if [[ -f "$CONFIG_PATH" ]]; then
+  CONFIG_BACKUP="$CONFIG_PATH.bak-$STAMP"
+  cp "$CONFIG_PATH" "$CONFIG_BACKUP"
+fi
+if [[ -f "$AUTH_PATH" ]]; then
+  AUTH_BACKUP="$AUTH_PATH.bak-$STAMP"
+  cp "$AUTH_PATH" "$AUTH_BACKUP"
+fi
+
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -euo pipefail'
+  echo 'restored=false'
+  if [[ -n "$CONFIG_BACKUP" ]]; then
+    printf 'cp %q %q\n' "$CONFIG_BACKUP" "$CONFIG_PATH"
+    echo 'restored=true'
+  fi
+  if [[ -n "$AUTH_BACKUP" ]]; then
+    printf 'cp %q %q\n' "$AUTH_BACKUP" "$AUTH_PATH"
+    echo 'restored=true'
+  fi
+  echo 'if [[ "$restored" == true ]]; then'
+  echo '  echo "Restored Codex config/auth from backup."'
+  echo '  echo "Restart Codex so the restored files are loaded."'
+  echo 'else'
+  echo '  echo "No backup files were available to restore."'
+  echo 'fi'
+} > "$RESTORE_PATH"
+chmod +x "$RESTORE_PATH"
 
 BASE_URL="$BASE_URL" API_KEY="$API_KEY" CONFIG_PATH="$CONFIG_PATH" AUTH_PATH="$AUTH_PATH" "$PYTHON_BIN" - <<'PY'
 import json
@@ -123,5 +189,8 @@ echo
 echo "Updated:"
 echo "  $CONFIG_PATH"
 echo "  $AUTH_PATH"
+echo "Restore helper:"
+echo "  bash \"$RESTORE_PATH\""
 echo "Backups were created for existing files."
+echo "Restart Codex to load the new config and API key auth mode."
 echo "Done."

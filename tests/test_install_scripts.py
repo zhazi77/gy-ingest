@@ -23,6 +23,8 @@ class InstallScriptTests(unittest.TestCase):
             self.assertIn("goals", script)
             self.assertIn("false", script)
             self.assertIn("OPENAI_API_KEY", script)
+            self.assertIn("Restart Codex", script)
+            self.assertIn("restore", script)
 
     def test_unix_installer_targets_home_codex_directory(self):
         bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
@@ -58,8 +60,10 @@ class InstallScriptTests(unittest.TestCase):
 
         self.assertIn("Backup-IfExists $configPath", powershell)
         self.assertIn("Backup-IfExists $authPath", powershell)
-        self.assertIn("cp \"$CONFIG_PATH\" \"$CONFIG_PATH.bak-$STAMP\"", bash)
-        self.assertIn("cp \"$AUTH_PATH\" \"$AUTH_PATH.bak-$STAMP\"", bash)
+        self.assertIn('CONFIG_BACKUP="$CONFIG_PATH.bak-$STAMP"', bash)
+        self.assertIn('AUTH_BACKUP="$AUTH_PATH.bak-$STAMP"', bash)
+        self.assertIn('cp "$CONFIG_PATH" "$CONFIG_BACKUP"', bash)
+        self.assertIn('cp "$AUTH_PATH" "$AUTH_BACKUP"', bash)
 
     @unittest.skipIf(shutil.which("powershell") is None, "PowerShell is not available")
     def test_powershell_installer_merges_existing_config(self):
@@ -76,6 +80,7 @@ class InstallScriptTests(unittest.TestCase):
             env = os.environ.copy()
             env["USERPROFILE"] = str(root)
             env["CODEX_SUB2API_KEY"] = "sk-test"
+            env["CODEX_SUB2API_CONFIRM"] = "yes"
             subprocess.run(
                 [
                     "powershell",
@@ -91,6 +96,7 @@ class InstallScriptTests(unittest.TestCase):
 
             config = (codex / "config.toml").read_text(encoding="utf-8")
             auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
+            restore_exists = (codex / "restore-sub2api-backup.ps1").exists()
 
         self.assertNotIn("[]", config)
         self.assertIn('foo = "keep"', config)
@@ -100,6 +106,7 @@ class InstallScriptTests(unittest.TestCase):
         self.assertIn('base_url = "https://771to8vw3580.vicp.fun"', config)
         self.assertEqual(auth["OTHER"], "keep")
         self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
+        self.assertTrue(restore_exists)
 
     @unittest.skipIf(shutil.which("powershell") is None, "PowerShell is not available")
     def test_powershell_installer_switches_chatgpt_auth_to_api_key(self):
@@ -124,7 +131,7 @@ class InstallScriptTests(unittest.TestCase):
             env = os.environ.copy()
             env["USERPROFILE"] = str(root)
             env["CODEX_SUB2API_KEY"] = "sk-test"
-            subprocess.run(
+            result = subprocess.run(
                 [
                     "powershell",
                     "-ExecutionPolicy",
@@ -135,6 +142,7 @@ class InstallScriptTests(unittest.TestCase):
                 env=env,
                 check=True,
                 capture_output=True,
+                text=True,
             )
 
             auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
@@ -144,6 +152,18 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual(auth["OTHER"], "keep")
         self.assertNotIn("tokens", auth)
         self.assertNotIn("last_refresh", auth)
+        self.assertIn("Detected existing Codex ChatGPT login", result.stdout)
+        self.assertIn("Switching Codex auth mode to API key", result.stdout)
+        self.assertIn("Restart Codex", result.stdout)
+
+    def test_install_scripts_create_restore_helpers(self):
+        powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
+        bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
+
+        self.assertIn("restore-sub2api-backup.ps1", powershell)
+        self.assertIn("Copy-Item", powershell)
+        self.assertIn("restore-sub2api-backup.sh", bash)
+        self.assertIn("cp ", bash)
 
 
 if __name__ == "__main__":

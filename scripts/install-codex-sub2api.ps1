@@ -8,8 +8,11 @@ function Backup-IfExists {
   param([string]$Path)
   if (Test-Path -LiteralPath $Path) {
     $stamp = Get-Date -Format "yyyyMMddHHmmss"
-    Copy-Item -LiteralPath $Path -Destination "$Path.bak-$stamp" -Force
+    $backupPath = "$Path.bak-$stamp"
+    Copy-Item -LiteralPath $Path -Destination $backupPath -Force
+    return $backupPath
   }
+  return $null
 }
 
 function Set-TomlValue {
@@ -96,6 +99,77 @@ function Set-CodexApiKeyAuth {
   [System.IO.File]::WriteAllText($Path, $jsonText, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Read-ExistingAuth {
+  param([string]$Path)
+  if (-not (Test-Path -LiteralPath $Path)) {
+    return $null
+  }
+  try {
+    return Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json
+  } catch {
+    return $null
+  }
+}
+
+function Confirm-AuthSwitch {
+  param([AllowNull()]$ExistingAuth)
+
+  $hasChatGptAuth = $false
+  if ($null -ne $ExistingAuth) {
+    $hasChatGptAuth = ($ExistingAuth.auth_mode -eq "chatgpt") -or ($null -ne $ExistingAuth.PSObject.Properties["tokens"])
+  }
+
+  if ($hasChatGptAuth) {
+    Write-Host "Detected existing Codex ChatGPT login."
+    Write-Host "Switching Codex auth mode to API key and removing cached ChatGPT tokens from auth.json."
+    Write-Host "Restart Codex after this installer finishes so the new auth mode is loaded."
+    if (-not $env:CODEX_SUB2API_CONFIRM) {
+      $answer = Read-Host "Continue? [Y/n]"
+      if ($answer -match '^(n|no)$') {
+        Write-Host "Aborted. No files were changed."
+        exit 4
+      }
+    }
+  } else {
+    Write-Host "No existing Codex ChatGPT login detected."
+  }
+}
+
+function Escape-SingleQuotedPowerShell {
+  param([string]$Value)
+  return $Value.Replace("'", "''")
+}
+
+function Write-RestoreScript {
+  param(
+    [string]$Path,
+    [AllowNull()][string]$ConfigBackup,
+    [AllowNull()][string]$AuthBackup,
+    [string]$ConfigPath,
+    [string]$AuthPath
+  )
+
+  $lines = New-Object System.Collections.Generic.List[string]
+  $lines.Add('$ErrorActionPreference = "Stop"')
+  $lines.Add('$restored = $false')
+  if ($ConfigBackup) {
+    $lines.Add("Copy-Item -LiteralPath '$(Escape-SingleQuotedPowerShell $ConfigBackup)' -Destination '$(Escape-SingleQuotedPowerShell $ConfigPath)' -Force")
+    $lines.Add('$restored = $true')
+  }
+  if ($AuthBackup) {
+    $lines.Add("Copy-Item -LiteralPath '$(Escape-SingleQuotedPowerShell $AuthBackup)' -Destination '$(Escape-SingleQuotedPowerShell $AuthPath)' -Force")
+    $lines.Add('$restored = $true')
+  }
+  $lines.Add('if ($restored) {')
+  $lines.Add('  Write-Host "Restored Codex config/auth from backup."')
+  $lines.Add('  Write-Host "Restart Codex so the restored files are loaded."')
+  $lines.Add('} else {')
+  $lines.Add('  Write-Host "No backup files were available to restore."')
+  $lines.Add('}')
+
+  [System.IO.File]::WriteAllText($Path, ($lines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+}
+
 Write-Host "Codex Sub2API installer"
 Write-Host "Base URL: $BaseUrl"
 if ($env:CODEX_SUB2API_KEY) {
@@ -117,10 +191,15 @@ if ([string]::IsNullOrWhiteSpace($apiKey)) {
 $codexDir = Join-Path $env:USERPROFILE ".codex"
 $configPath = Join-Path $codexDir "config.toml"
 $authPath = Join-Path $codexDir "auth.json"
+$restorePath = Join-Path $codexDir "restore-sub2api-backup.ps1"
 New-Item -ItemType Directory -Path $codexDir -Force | Out-Null
 
-Backup-IfExists $configPath
-Backup-IfExists $authPath
+$existingAuth = Read-ExistingAuth $authPath
+Confirm-AuthSwitch $existingAuth
+
+$configBackup = Backup-IfExists $configPath
+$authBackup = Backup-IfExists $authPath
+Write-RestoreScript $restorePath $configBackup $authBackup $configPath $authPath
 
 $lines = if (Test-Path -LiteralPath $configPath) {
   @(Get-Content -LiteralPath $configPath)
@@ -151,5 +230,8 @@ Write-Host ""
 Write-Host "Updated:"
 Write-Host "  $configPath"
 Write-Host "  $authPath"
+Write-Host "Restore helper:"
+Write-Host "  powershell -ExecutionPolicy Bypass -File `"$restorePath`""
 Write-Host "Backups were created for existing files."
+Write-Host "Restart Codex to load the new config and API key auth mode."
 Write-Host "Done."
