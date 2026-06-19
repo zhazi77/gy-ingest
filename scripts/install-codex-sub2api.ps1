@@ -127,7 +127,7 @@ function Confirm-AuthSwitch {
       $answer = Read-Host "是否继续？直接回车表示继续，[n] 取消"
       if ($answer -match '^(n|no)$') {
         Write-Host "已取消，没有修改文件。"
-        exit 4
+        exit 0
       }
     }
   } else {

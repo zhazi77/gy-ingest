@@ -60,7 +60,7 @@ if [[ "$AUTH_STATE" == "chatgpt" ]]; then
     case "$answer" in
       n|N|no|NO|No)
         echo "已取消，没有修改文件。"
-        exit 4
+        exit 0
         ;;
     esac
   fi

@@ -168,6 +168,53 @@ class InstallScriptTests(unittest.TestCase):
         self.assertIn("将把 Codex 切换为 API key 模式", result.stdout)
         self.assertIn("请完全退出并重新打开 Codex", result.stdout)
 
+    @unittest.skipIf(shutil.which("powershell") is None, "PowerShell is not available")
+    def test_powershell_installer_cancel_exits_successfully_without_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex = root / ".codex"
+            codex.mkdir()
+            original_auth = json.dumps(
+                {
+                    "auth_mode": "chatgpt",
+                    "OPENAI_API_KEY": None,
+                    "tokens": {"access_token": "old"},
+                }
+            ) + "\n"
+            (codex / "auth.json").write_text(original_auth, encoding="utf-8")
+
+            env = os.environ.copy()
+            env["USERPROFILE"] = str(root)
+            env["CODEX_SUB2API_KEY"] = "sk-test"
+            env.pop("CODEX_SUB2API_CONFIRM", None)
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-Command",
+                    (
+                        "$script = [System.Text.Encoding]::UTF8.GetString("
+                        f"[System.IO.File]::ReadAllBytes('{ROOT / 'scripts' / 'install-codex-sub2api.ps1'}')); "
+                        "Invoke-Expression $script"
+                    ),
+                ],
+                input="n\n",
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+            auth_after = (codex / "auth.json").read_text(encoding="utf-8")
+            config_exists = (codex / "config.toml").exists()
+
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("已取消，没有修改文件。", result.stdout)
+        self.assertEqual(auth_after, original_auth)
+        self.assertFalse(config_exists)
+
     def test_install_scripts_create_restore_helpers(self):
         powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
         bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
