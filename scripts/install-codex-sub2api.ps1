@@ -72,11 +72,10 @@ function Set-TomlValue {
   return $out.ToArray()
 }
 
-function Set-JsonProperty {
+function Set-CodexApiKeyAuth {
   param(
     [string]$Path,
-    [string]$Key,
-    [string]$Value
+    [string]$ApiKey
   )
 
   if (Test-Path -LiteralPath $Path) {
@@ -89,7 +88,10 @@ function Set-JsonProperty {
     $json = [pscustomobject]@{}
   }
 
-  $json | Add-Member -NotePropertyName $Key -NotePropertyValue $Value -Force
+  $json.PSObject.Properties.Remove("tokens")
+  $json.PSObject.Properties.Remove("last_refresh")
+  $json | Add-Member -NotePropertyName "auth_mode" -NotePropertyValue "api_key" -Force
+  $json | Add-Member -NotePropertyName "OPENAI_API_KEY" -NotePropertyValue $ApiKey -Force
   $jsonText = ($json | ConvertTo-Json -Depth 20) + "`n"
   [System.IO.File]::WriteAllText($Path, $jsonText, [System.Text.UTF8Encoding]::new($false))
 }
@@ -143,7 +145,7 @@ $lines = Set-TomlValue -Lines $lines -Section "features" -Key "goals" -Value "fa
 
 $configText = ($lines -join "`n").TrimEnd() + "`n"
 [System.IO.File]::WriteAllText($configPath, $configText, [System.Text.UTF8Encoding]::new($false))
-Set-JsonProperty $authPath "OPENAI_API_KEY" $apiKey
+Set-CodexApiKeyAuth $authPath $apiKey
 
 Write-Host ""
 Write-Host "Updated:"

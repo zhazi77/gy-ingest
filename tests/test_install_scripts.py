@@ -101,6 +101,50 @@ class InstallScriptTests(unittest.TestCase):
         self.assertEqual(auth["OTHER"], "keep")
         self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
 
+    @unittest.skipIf(shutil.which("powershell") is None, "PowerShell is not available")
+    def test_powershell_installer_switches_chatgpt_auth_to_api_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            codex = root / ".codex"
+            codex.mkdir()
+            (codex / "auth.json").write_text(
+                json.dumps(
+                    {
+                        "auth_mode": "chatgpt",
+                        "OPENAI_API_KEY": None,
+                        "tokens": {"access_token": "old"},
+                        "last_refresh": "2026-06-19T00:00:00Z",
+                        "OTHER": "keep",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            env = os.environ.copy()
+            env["USERPROFILE"] = str(root)
+            env["CODEX_SUB2API_KEY"] = "sk-test"
+            subprocess.run(
+                [
+                    "powershell",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(ROOT / "scripts" / "install-codex-sub2api.ps1"),
+                ],
+                env=env,
+                check=True,
+                capture_output=True,
+            )
+
+            auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(auth["auth_mode"], "api_key")
+        self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
+        self.assertEqual(auth["OTHER"], "keep")
+        self.assertNotIn("tokens", auth)
+        self.assertNotIn("last_refresh", auth)
+
 
 if __name__ == "__main__":
     unittest.main()

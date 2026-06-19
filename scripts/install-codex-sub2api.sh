@@ -112,6 +112,9 @@ try:
 except Exception:
     auth = {}
 
+auth.pop("tokens", None)
+auth.pop("last_refresh", None)
+auth["auth_mode"] = "api_key"
 auth["OPENAI_API_KEY"] = api_key
 auth_path.write_text(json.dumps(auth, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
