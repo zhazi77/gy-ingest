@@ -121,3 +121,24 @@ After the health check passes, run the real sync with:
 cd ~/gy-ingest
 python3 -m gy_ingest.sync_rss --wiki-root ~/gy-wiki --git --push
 ```
+
+## Install Codex Sub2API Config
+
+Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/zhazi77/gy-ingest/main/scripts/install-codex-sub2api.ps1 | iex
+```
+
+Linux / macOS:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/zhazi77/gy-ingest/main/scripts/install-codex-sub2api.sh | bash
+```
+
+The installer prompts for the API key, backs up existing Codex config files, and merges only the required settings:
+
+- `%USERPROFILE%\.codex\config.toml` or `~/.codex/config.toml`
+- `%USERPROFILE%\.codex\auth.json` or `~/.codex/auth.json`
+
+It keeps unrelated existing settings.
