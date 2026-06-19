@@ -3,16 +3,27 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-https://771to8vw3580.vicp.fun}"
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
+PYTHON_BIN="${PYTHON_BIN:-}"
 
 echo "Codex Sub2API installer"
 echo "Base URL: $BASE_URL"
 printf "Paste API key: "
-IFS= read -r API_KEY
+IFS= read -r -s API_KEY
+echo
 API_KEY="$(printf '%s' "$API_KEY" | tr -d '\r\n ')"
 
 if [[ -z "$API_KEY" ]]; then
   echo "ERROR: API key is empty." >&2
   exit 2
+fi
+
+if [[ -z "$PYTHON_BIN" ]]; then
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_BIN="python3"
+  else
+    echo "ERROR: python3 is required to merge Codex config." >&2
+    exit 3
+  fi
 fi
 
 mkdir -p "$CODEX_HOME"
@@ -23,7 +34,7 @@ STAMP="$(date +%Y%m%d%H%M%S)"
 [[ -f "$CONFIG_PATH" ]] && cp "$CONFIG_PATH" "$CONFIG_PATH.bak-$STAMP"
 [[ -f "$AUTH_PATH" ]] && cp "$AUTH_PATH" "$AUTH_PATH.bak-$STAMP"
 
-BASE_URL="$BASE_URL" API_KEY="$API_KEY" CONFIG_PATH="$CONFIG_PATH" AUTH_PATH="$AUTH_PATH" python3 - <<'PY'
+BASE_URL="$BASE_URL" API_KEY="$API_KEY" CONFIG_PATH="$CONFIG_PATH" AUTH_PATH="$AUTH_PATH" "$PYTHON_BIN" - <<'PY'
 import json
 import os
 from pathlib import Path

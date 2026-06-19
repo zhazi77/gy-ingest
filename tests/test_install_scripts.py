@@ -24,6 +24,27 @@ class InstallScriptTests(unittest.TestCase):
             self.assertIn("false", script)
             self.assertIn("OPENAI_API_KEY", script)
 
+    def test_unix_installer_targets_home_codex_directory(self):
+        bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
+
+        self.assertIn('CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"', bash)
+        self.assertIn('CONFIG_PATH="$CODEX_HOME/config.toml"', bash)
+        self.assertIn('AUTH_PATH="$CODEX_HOME/auth.json"', bash)
+        self.assertIn('mkdir -p "$CODEX_HOME"', bash)
+
+    def test_unix_installer_checks_for_python3_before_writing(self):
+        bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
+
+        self.assertIn('PYTHON_BIN="${PYTHON_BIN:-}"', bash)
+        self.assertIn('command -v python3', bash)
+        self.assertIn('ERROR: python3 is required', bash)
+        self.assertLess(bash.index('command -v python3'), bash.index('mkdir -p "$CODEX_HOME"'))
+
+    def test_shell_scripts_are_kept_lf_for_unix(self):
+        attrs = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+
+        self.assertIn("*.sh text eol=lf", attrs)
+
     def test_install_scripts_create_backups_before_writing(self):
         powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
         bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
