@@ -48,8 +48,10 @@ class InstallScriptTests(unittest.TestCase):
         self.assertIn("*.sh text eol=lf", attrs)
 
     def test_powershell_installer_hides_api_key_input(self):
-        powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
+        powershell_path = ROOT / "scripts" / "install-codex-sub2api.ps1"
+        powershell = powershell_path.read_text(encoding="utf-8")
 
+        self.assertFalse(powershell_path.read_bytes().startswith(b"\xef\xbb\xbf"))
         self.assertIn("Read-Host \"请粘贴 API key（输入时不会显示）\" -AsSecureString", powershell)
         self.assertIn("SecureStringToBSTR", powershell)
         self.assertIn("ZeroFreeBSTR", powershell)
@@ -86,8 +88,12 @@ class InstallScriptTests(unittest.TestCase):
                     "powershell",
                     "-ExecutionPolicy",
                     "Bypass",
-                    "-File",
-                    str(ROOT / "scripts" / "install-codex-sub2api.ps1"),
+                    "-Command",
+                    (
+                        "$script = [System.Text.Encoding]::UTF8.GetString("
+                        f"[System.IO.File]::ReadAllBytes('{ROOT / 'scripts' / 'install-codex-sub2api.ps1'}')); "
+                        "Invoke-Expression $script"
+                    ),
                 ],
                 env=env,
                 check=True,
@@ -136,8 +142,12 @@ class InstallScriptTests(unittest.TestCase):
                     "powershell",
                     "-ExecutionPolicy",
                     "Bypass",
-                    "-File",
-                    str(ROOT / "scripts" / "install-codex-sub2api.ps1"),
+                    "-Command",
+                    (
+                        "$script = [System.Text.Encoding]::UTF8.GetString("
+                        f"[System.IO.File]::ReadAllBytes('{ROOT / 'scripts' / 'install-codex-sub2api.ps1'}')); "
+                        "Invoke-Expression $script"
+                    ),
                 ],
                 env=env,
                 check=True,
@@ -166,6 +176,13 @@ class InstallScriptTests(unittest.TestCase):
         self.assertIn("Copy-Item", powershell)
         self.assertIn("restore-sub2api-backup.sh", bash)
         self.assertIn("cp ", bash)
+
+    def test_static_server_declares_utf8_for_install_scripts(self):
+        server = (ROOT / "scripts" / "codex_installer_site.py").read_text(encoding="utf-8")
+
+        self.assertIn("charset=utf-8", server)
+        self.assertIn(".ps1", server)
+        self.assertIn(".sh", server)
 
 
 if __name__ == "__main__":

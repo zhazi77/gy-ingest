@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$BaseUrl = "https://771to8vw3580.vicp.fun"
 )
 
