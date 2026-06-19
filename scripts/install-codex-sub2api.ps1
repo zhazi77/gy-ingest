@@ -115,6 +115,7 @@ function Confirm-AuthSwitch {
   param([AllowNull()]$ExistingAuth)
 
   $hasChatGptAuth = $false
+  $shouldContinue = $true
   if ($null -ne $ExistingAuth) {
     $hasChatGptAuth = ($ExistingAuth.auth_mode -eq "chatgpt") -or ($null -ne $ExistingAuth.PSObject.Properties["tokens"])
   }
@@ -127,12 +128,13 @@ function Confirm-AuthSwitch {
       $answer = Read-Host "是否继续？直接回车表示继续，[n] 取消"
       if ($answer -match '^(n|no)$') {
         Write-Host "已取消，没有修改文件。"
-        exit 0
+        $shouldContinue = $false
       }
     }
   } else {
     Write-Host "未检测到已有的 Codex ChatGPT 登录态。"
   }
+  $shouldContinue
 }
 
 function Escape-SingleQuotedPowerShell {
@@ -195,43 +197,45 @@ $restorePath = Join-Path $codexDir "restore-sub2api-backup.ps1"
 New-Item -ItemType Directory -Path $codexDir -Force | Out-Null
 
 $existingAuth = Read-ExistingAuth $authPath
-Confirm-AuthSwitch $existingAuth
+$continueInstall = Confirm-AuthSwitch $existingAuth
 
-$configBackup = Backup-IfExists $configPath
-$authBackup = Backup-IfExists $authPath
-Write-RestoreScript $restorePath $configBackup $authBackup $configPath $authPath
+if ($continueInstall) {
+  $configBackup = Backup-IfExists $configPath
+  $authBackup = Backup-IfExists $authPath
+  Write-RestoreScript $restorePath $configBackup $authBackup $configPath $authPath
 
-$lines = if (Test-Path -LiteralPath $configPath) {
-  @(Get-Content -LiteralPath $configPath)
-} else {
-  @()
+  $lines = if (Test-Path -LiteralPath $configPath) {
+    @(Get-Content -LiteralPath $configPath)
+  } else {
+    @()
+  }
+
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "model_provider" -Value '"OpenAI"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "model" -Value '"gpt-5.5"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "review_model" -Value '"gpt-5.5"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "model_reasoning_effort" -Value '"high"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "disable_response_storage" -Value "true"
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "network_access" -Value '"enabled"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "windows_wsl_setup_acknowledged" -Value "true"
+
+  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "name" -Value '"OpenAI"'
+  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "base_url" -Value "`"$BaseUrl`""
+  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "wire_api" -Value '"responses"'
+  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "requires_openai_auth" -Value "true"
+
+  $lines = Set-TomlValue -Lines $lines -Section "features" -Key "goals" -Value "false"
+
+  $configText = ($lines -join "`n").TrimEnd() + "`n"
+  [System.IO.File]::WriteAllText($configPath, $configText, [System.Text.UTF8Encoding]::new($false))
+  Set-CodexApiKeyAuth $authPath $apiKey
+
+  Write-Host ""
+  Write-Host "已更新："
+  Write-Host "  $configPath"
+  Write-Host "  $authPath"
+  Write-Host "如需恢复到安装前的配置，请运行："
+  Write-Host "  powershell -ExecutionPolicy Bypass -File `"$restorePath`""
+  Write-Host "已为现有配置文件创建备份。"
+  Write-Host "请完全退出并重新打开 Codex，让新的配置和 API key 认证模式生效。"
+  Write-Host "完成。"
 }
-
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "model_provider" -Value '"OpenAI"'
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "model" -Value '"gpt-5.5"'
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "review_model" -Value '"gpt-5.5"'
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "model_reasoning_effort" -Value '"high"'
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "disable_response_storage" -Value "true"
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "network_access" -Value '"enabled"'
-$lines = Set-TomlValue -Lines $lines -Section $null -Key "windows_wsl_setup_acknowledged" -Value "true"
-
-$lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "name" -Value '"OpenAI"'
-$lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "base_url" -Value "`"$BaseUrl`""
-$lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "wire_api" -Value '"responses"'
-$lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "requires_openai_auth" -Value "true"
-
-$lines = Set-TomlValue -Lines $lines -Section "features" -Key "goals" -Value "false"
-
-$configText = ($lines -join "`n").TrimEnd() + "`n"
-[System.IO.File]::WriteAllText($configPath, $configText, [System.Text.UTF8Encoding]::new($false))
-Set-CodexApiKeyAuth $authPath $apiKey
-
-Write-Host ""
-Write-Host "已更新："
-Write-Host "  $configPath"
-Write-Host "  $authPath"
-Write-Host "如需恢复到安装前的配置，请运行："
-Write-Host "  powershell -ExecutionPolicy Bypass -File `"$restorePath`""
-Write-Host "已为现有配置文件创建备份。"
-Write-Host "请完全退出并重新打开 Codex，让新的配置和 API key 认证模式生效。"
-Write-Host "完成。"

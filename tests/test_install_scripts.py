@@ -92,7 +92,7 @@ class InstallScriptTests(unittest.TestCase):
                     (
                         "$script = [System.Text.Encoding]::UTF8.GetString("
                         f"[System.IO.File]::ReadAllBytes('{ROOT / 'scripts' / 'install-codex-sub2api.ps1'}')); "
-                        "Invoke-Expression $script"
+                        "Invoke-Expression $script; Write-Host AFTER_CANCEL"
                     ),
                 ],
                 env=env,
@@ -187,17 +187,26 @@ class InstallScriptTests(unittest.TestCase):
             env["USERPROFILE"] = str(root)
             env["CODEX_SUB2API_KEY"] = "sk-test"
             env.pop("CODEX_SUB2API_CONFIRM", None)
+            wrapper = root / "wrapper.ps1"
+            wrapper.write_text(
+                "\n".join(
+                    [
+                        "$script = [System.Text.Encoding]::UTF8.GetString("
+                        f"[System.IO.File]::ReadAllBytes('{ROOT / 'scripts' / 'install-codex-sub2api.ps1'}'))",
+                        "Invoke-Expression $script",
+                        "Write-Host AFTER_CANCEL",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
             result = subprocess.run(
                 [
                     "powershell",
                     "-ExecutionPolicy",
                     "Bypass",
-                    "-Command",
-                    (
-                        "$script = [System.Text.Encoding]::UTF8.GetString("
-                        f"[System.IO.File]::ReadAllBytes('{ROOT / 'scripts' / 'install-codex-sub2api.ps1'}')); "
-                        "Invoke-Expression $script"
-                    ),
+                    "-File",
+                    str(wrapper),
                 ],
                 input="n\n",
                 env=env,
@@ -212,6 +221,7 @@ class InstallScriptTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0)
         self.assertIn("已取消，没有修改文件。", result.stdout)
+        self.assertIn("AFTER_CANCEL", result.stdout)
         self.assertEqual(auth_after, original_auth)
         self.assertFalse(config_exists)
 
