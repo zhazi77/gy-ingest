@@ -217,7 +217,8 @@ if ($continueInstall) {
     @()
   }
 
-  $lines = Set-TomlValue -Lines $lines -Section $null -Key "model_provider" -Value '"OpenAI"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "model_provider" -Value '"openai"'
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "openai_base_url" -Value "`"$BaseUrl`""
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "model" -Value '"gpt-5.5"'
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "review_model" -Value '"gpt-5.5"'
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "model_reasoning_effort" -Value '"high"'
@@ -226,10 +227,6 @@ if ($continueInstall) {
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "windows_wsl_setup_acknowledged" -Value "true"
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "cli_auth_credentials_store" -Value '"file"'
 
-  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "name" -Value '"OpenAI"'
-  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "base_url" -Value "`"$BaseUrl`""
-  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "wire_api" -Value '"responses"'
-  $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "requires_openai_auth" -Value "true"
 
   $lines = Set-TomlValue -Lines $lines -Section "features" -Key "goals" -Value "false"
 

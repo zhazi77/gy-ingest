@@ -159,7 +159,8 @@ base_url = os.environ["BASE_URL"]
 lines = config_path.read_text(encoding="utf-8").splitlines() if config_path.exists() else []
 
 for section, key, value in [
-    (None, "model_provider", '"OpenAI"'),
+    (None, "model_provider", '"openai"'),
+    (None, "openai_base_url", json.dumps(base_url)),
     (None, "model", '"gpt-5.5"'),
     (None, "review_model", '"gpt-5.5"'),
     (None, "model_reasoning_effort", '"high"'),
@@ -167,10 +168,6 @@ for section, key, value in [
     (None, "network_access", '"enabled"'),
     (None, "windows_wsl_setup_acknowledged", "true"),
     (None, "cli_auth_credentials_store", '"file"'),
-    ("model_providers.OpenAI", "name", '"OpenAI"'),
-    ("model_providers.OpenAI", "base_url", json.dumps(base_url)),
-    ("model_providers.OpenAI", "wire_api", '"responses"'),
-    ("model_providers.OpenAI", "requires_openai_auth", "true"),
     ("features", "goals", "false"),
 ]:
     lines = set_toml_value(lines, section, key, value)

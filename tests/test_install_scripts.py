@@ -37,6 +37,15 @@ class InstallScriptTests(unittest.TestCase):
         self.assertNotIn('NotePropertyName "auth_mode"', powershell)
         self.assertNotIn('auth["auth_mode"]', bash)
 
+    def test_installers_reuse_builtin_openai_provider_id(self):
+        powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
+        bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
+
+        for script in (powershell, bash):
+            self.assertIn("openai_base_url", script)
+            self.assertNotIn("model_providers.openai", script)
+            self.assertNotIn("model_providers.OpenAI", script)
+
     def test_unix_installer_targets_home_codex_directory(self):
         bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
 
@@ -136,7 +145,9 @@ class InstallScriptTests(unittest.TestCase):
         self.assertIn("old_feature = true", config)
         self.assertIn('model_reasoning_effort = "high"', config)
         self.assertIn("goals = false", config)
-        self.assertIn('base_url = "https://771to8vw3580.vicp.fun"', config)
+        self.assertIn('openai_base_url = "https://771to8vw3580.vicp.fun"', config)
+        self.assertIn('model_provider = "openai"', config)
+        self.assertNotIn("[model_providers.", config)
         self.assertIn('cli_auth_credentials_store = "file"', config)
         self.assertNotIn("OTHER", auth)
         self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
