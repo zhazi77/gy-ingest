@@ -26,6 +26,11 @@ if [[ -z "$PYTHON_BIN" ]]; then
   fi
 fi
 
+if ! command -v codex >/dev/null 2>&1; then
+  echo "错误：未找到 codex 命令。请先安装 Codex，并确认 codex 已加入 PATH。" >&2
+  exit 4
+fi
+
 mkdir -p "$CODEX_HOME"
 CONFIG_PATH="$CODEX_HOME/config.toml"
 AUTH_PATH="$CODEX_HOME/auth.json"
@@ -100,7 +105,9 @@ fi
 } > "$RESTORE_PATH"
 chmod +x "$RESTORE_PATH"
 
-BASE_URL="$BASE_URL" API_KEY="$API_KEY" CONFIG_PATH="$CONFIG_PATH" AUTH_PATH="$AUTH_PATH" "$PYTHON_BIN" - <<'PY'
+printf '%s\n' "$API_KEY" | CODEX_HOME="$CODEX_HOME" codex login --with-api-key
+
+BASE_URL="$BASE_URL" CONFIG_PATH="$CONFIG_PATH" "$PYTHON_BIN" - <<'PY'
 import json
 import os
 from pathlib import Path
@@ -147,9 +154,7 @@ def set_toml_value(lines, section, key, value):
 
 
 config_path = Path(os.environ["CONFIG_PATH"])
-auth_path = Path(os.environ["AUTH_PATH"])
 base_url = os.environ["BASE_URL"]
-api_key = os.environ["API_KEY"]
 
 lines = config_path.read_text(encoding="utf-8").splitlines() if config_path.exists() else []
 
@@ -161,6 +166,7 @@ for section, key, value in [
     (None, "disable_response_storage", "true"),
     (None, "network_access", '"enabled"'),
     (None, "windows_wsl_setup_acknowledged", "true"),
+    (None, "cli_auth_credentials_store", '"file"'),
     ("model_providers.OpenAI", "name", '"OpenAI"'),
     ("model_providers.OpenAI", "base_url", json.dumps(base_url)),
     ("model_providers.OpenAI", "wire_api", '"responses"'),
@@ -171,18 +177,6 @@ for section, key, value in [
 
 config_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
-try:
-    auth = json.loads(auth_path.read_text(encoding="utf-8")) if auth_path.exists() else {}
-    if not isinstance(auth, dict):
-        auth = {}
-except Exception:
-    auth = {}
-
-auth.pop("tokens", None)
-auth.pop("last_refresh", None)
-auth["auth_mode"] = "api_key"
-auth["OPENAI_API_KEY"] = api_key
-auth_path.write_text(json.dumps(auth, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 PY
 
 echo

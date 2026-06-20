@@ -75,28 +75,35 @@ function Set-TomlValue {
   return $out.ToArray()
 }
 
-function Set-CodexApiKeyAuth {
+function Invoke-CodexApiKeyLogin {
   param(
-    [string]$Path,
-    [string]$ApiKey
+    [string]$ApiKey,
+    [string]$CodexHome
   )
 
-  if (Test-Path -LiteralPath $Path) {
-    try {
-      $json = Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json
-    } catch {
-      $json = [pscustomobject]@{}
-    }
-  } else {
-    $json = [pscustomobject]@{}
+  $desktopCodex = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA "OpenAI\Codex\bin") -Recurse -Filter "codex.exe" -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+  $pathCodex = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
+  $codexPath = if ($null -ne $desktopCodex) { $desktopCodex.FullName } elseif ($null -ne $pathCodex) { $pathCodex.Source } else { $null }
+  if ([string]::IsNullOrWhiteSpace($codexPath)) {
+    throw "未找到 codex 命令。请先安装 Codex，并确认 codex 已加入 PATH。"
   }
 
-  $json.PSObject.Properties.Remove("tokens")
-  $json.PSObject.Properties.Remove("last_refresh")
-  $json | Add-Member -NotePropertyName "auth_mode" -NotePropertyValue "api_key" -Force
-  $json | Add-Member -NotePropertyName "OPENAI_API_KEY" -NotePropertyValue $ApiKey -Force
-  $jsonText = ($json | ConvertTo-Json -Depth 20) + "`n"
-  [System.IO.File]::WriteAllText($Path, $jsonText, [System.Text.UTF8Encoding]::new($false))
+  $previousCodexHome = $env:CODEX_HOME
+  try {
+    $env:CODEX_HOME = $CodexHome
+    $ApiKey | & $codexPath login --with-api-key
+    if ($LASTEXITCODE -ne 0) {
+      throw "Codex API key 登录失败，退出代码：$LASTEXITCODE"
+    }
+  } finally {
+    if ($null -eq $previousCodexHome) {
+      Remove-Item Env:CODEX_HOME -ErrorAction SilentlyContinue
+    } else {
+      $env:CODEX_HOME = $previousCodexHome
+    }
+  }
 }
 
 function Read-ExistingAuth {
@@ -190,7 +197,7 @@ if ([string]::IsNullOrWhiteSpace($apiKey)) {
   throw "API key 为空。"
 }
 
-$codexDir = Join-Path $env:USERPROFILE ".codex"
+$codexDir = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $env:USERPROFILE ".codex" }
 $configPath = Join-Path $codexDir "config.toml"
 $authPath = Join-Path $codexDir "auth.json"
 $restorePath = Join-Path $codexDir "restore-sub2api-backup.ps1"
@@ -217,6 +224,7 @@ if ($continueInstall) {
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "disable_response_storage" -Value "true"
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "network_access" -Value '"enabled"'
   $lines = Set-TomlValue -Lines $lines -Section $null -Key "windows_wsl_setup_acknowledged" -Value "true"
+  $lines = Set-TomlValue -Lines $lines -Section $null -Key "cli_auth_credentials_store" -Value '"file"'
 
   $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "name" -Value '"OpenAI"'
   $lines = Set-TomlValue -Lines $lines -Section "model_providers.OpenAI" -Key "base_url" -Value "`"$BaseUrl`""
@@ -227,7 +235,7 @@ if ($continueInstall) {
 
   $configText = ($lines -join "`n").TrimEnd() + "`n"
   [System.IO.File]::WriteAllText($configPath, $configText, [System.Text.UTF8Encoding]::new($false))
-  Set-CodexApiKeyAuth $authPath $apiKey
+  Invoke-CodexApiKeyLogin -ApiKey $apiKey -CodexHome $codexDir
 
   Write-Host ""
   Write-Host "已更新："

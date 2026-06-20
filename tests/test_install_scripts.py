@@ -22,9 +22,20 @@ class InstallScriptTests(unittest.TestCase):
             self.assertIn('"high"', script)
             self.assertIn("goals", script)
             self.assertIn("false", script)
-            self.assertIn("OPENAI_API_KEY", script)
+            self.assertIn("cli_auth_credentials_store", script)
+            self.assertIn('"file"', script)
+            self.assertNotIn('"api_key"', script)
             self.assertIn("请完全退出并重新打开 Codex", script)
             self.assertIn("restore", script)
+
+    def test_installers_delegate_auth_storage_to_codex_cli(self):
+        powershell = (ROOT / "scripts" / "install-codex-sub2api.ps1").read_text(encoding="utf-8")
+        bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
+
+        self.assertIn("login --with-api-key", powershell)
+        self.assertIn("login --with-api-key", bash)
+        self.assertNotIn('NotePropertyName "auth_mode"', powershell)
+        self.assertNotIn('auth["auth_mode"]', bash)
 
     def test_unix_installer_targets_home_codex_directory(self):
         bash = (ROOT / "scripts" / "install-codex-sub2api.sh").read_text(encoding="utf-8")
@@ -126,7 +137,8 @@ class InstallScriptTests(unittest.TestCase):
         self.assertIn('model_reasoning_effort = "high"', config)
         self.assertIn("goals = false", config)
         self.assertIn('base_url = "https://771to8vw3580.vicp.fun"', config)
-        self.assertEqual(auth["OTHER"], "keep")
+        self.assertIn('cli_auth_credentials_store = "file"', config)
+        self.assertNotIn("OTHER", auth)
         self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
         self.assertTrue(restore_exists)
         self.assertTrue(restore_has_bom)
@@ -179,9 +191,9 @@ class InstallScriptTests(unittest.TestCase):
 
             auth = json.loads((codex / "auth.json").read_text(encoding="utf-8"))
 
-        self.assertEqual(auth["auth_mode"], "api_key")
+        self.assertEqual(auth["auth_mode"], "apikey")
         self.assertEqual(auth["OPENAI_API_KEY"], "sk-test")
-        self.assertEqual(auth["OTHER"], "keep")
+        self.assertNotIn("OTHER", auth)
         self.assertNotIn("tokens", auth)
         self.assertNotIn("last_refresh", auth)
         self.assertIn("检测到 Codex 已经登录过 ChatGPT 账号", result.stdout)
